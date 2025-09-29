@@ -1,0 +1,221 @@
+{
+  "lastUpdated": "2025-09-29",
+  "teamName": "RapidMiner Tech Team",
+  "teamMembers": [
+    {
+      "name": "Faisal",
+      "role": "Solution Architect",
+      "skills": {
+        "monarch": 3,
+        "knowledgeStudio": 0,
+        "aiStudio": 3,
+        "aiHub": 3,
+        "aiCloud": 2,
+        "slcWorkbench": 0,
+        "slcHub": 0,
+        "panopticon": 5,
+        "graphStudio": 0,
+        "dataScience": 3,
+        "analytics": 5,
+        "traditionalAI": 2,
+        "genAI": 2,
+        "etl": 3,
+        "enterpriseData": 3
+      },
+      "industries": {
+        "primary": "Banking, Insurance, Automotive",
+        "secondary": "Digital Twin"
+      }
+    },
+    {
+      "name": "YY",
+      "role": "Principal Solution Architect",
+      "skills": {
+        "monarch": 0,
+        "knowledgeStudio": 0,
+        "aiStudio": 5,
+        "aiHub": 3,
+        "aiCloud": 4,
+        "slcWorkbench": 3,
+        "slcHub": 0,
+        "panopticon": 2,
+        "graphStudio": 0,
+        "dataScience": 5,
+        "analytics": 5,
+        "traditionalAI": 5,
+        "genAI": 2,
+        "etl": 5,
+        "enterpriseData": 3
+      },
+      "industries": {
+        "primary": "Life Sciences, Medical",
+        "secondary": "BFSI, Aerospace"
+      }
+    },
+    {
+      "name": "Jonathan",
+      "role": "",
+      "skills": {},
+      "industries": {
+        "primary": "",
+        "secondary": ""
+      }
+    },
+    {
+      "name": "Greg",
+      "role": "Solutions Engineer",
+      "skills": {
+        "monarch": 0,
+        "knowledgeStudio": 0,
+        "aiStudio": 2,
+        "aiHub": 0,
+        "aiCloud": 2,
+        "slcWorkbench": 0,
+        "slcHub": 0,
+        "panopticon": 0,
+        "graphStudio": 5,
+        "dataScience": 2,
+        "analytics": 5,
+        "traditionalAI": 2,
+        "genAI": 3,
+        "etl": 5,
+        "enterpriseData": 5
+      },
+      "industries": {
+        "primary": "Manufacturing, Energy",
+        "secondary": "Retail, Healthcare"
+      }
+    },
+    {
+      "name": "Ricardo",
+      "role": "",
+      "skills": {},
+      "industries": {
+        "primary": "",
+        "secondary": ""
+      }
+    },
+    {
+      "name": "Gautam",
+      "role": "",
+      "skills": {},
+      "industries": {
+        "primary": "",
+        "secondary": ""
+      }
+    },
+    {
+      "name": "Abhijeet",
+      "role": "",
+      "skills": {},
+      "industries": {
+        "primary": "",
+        "secondary": ""
+      }
+    },
+    {
+      "name": "Sharath",
+      "role": "",
+      "skills": {},
+      "industries": {
+        "primary": "",
+        "secondary": ""
+      }
+    },
+    {
+      "name": "Ricardo",
+      "role": "",
+      "skills": {},
+      "industries": {
+        "primary": "",
+        "secondary": ""
+      }
+    },
+    {
+      "name": "Kelly",
+      "role": "Solution Architect",
+      "skills": {},
+      "industries": {
+        "primary": "",
+        "secondary": ""
+      }
+    }
+  ],
+  "skillDefinitions": [
+    {
+      "key": "monarch",
+      "label": "Monarch",
+      "category": "product"
+    },
+    {
+      "key": "knowledgeStudio",
+      "label": "Knowledge Studio",
+      "category": "product"
+    },
+    {
+      "key": "aiStudio",
+      "label": "AI Studio",
+      "category": "product"
+    },
+    {
+      "key": "aiHub",
+      "label": "AI Hub",
+      "category": "product"
+    },
+    {
+      "key": "aiCloud",
+      "label": "AI Cloud",
+      "category": "product"
+    },
+    {
+      "key": "slcWorkbench",
+      "label": "SLC Workbench",
+      "category": "product"
+    },
+    {
+      "key": "slcHub",
+      "label": "SLC Hub",
+      "category": "product"
+    },
+    {
+      "key": "panopticon",
+      "label": "Panopticon",
+      "category": "product"
+    },
+    {
+      "key": "graphStudio",
+      "label": "Graph Studio",
+      "category": "product"
+    },
+    {
+      "key": "dataScience",
+      "label": "Data Science",
+      "category": "technical"
+    },
+    {
+      "key": "analytics",
+      "label": "Analytics",
+      "category": "technical"
+    },
+    {
+      "key": "traditionalAI",
+      "label": "Traditional AI (ML/DL)",
+      "category": "technical"
+    },
+    {
+      "key": "genAI",
+      "label": "Generative AI",
+      "category": "technical"
+    },
+    {
+      "key": "etl",
+      "label": "ETL/ELT",
+      "category": "technical"
+    },
+    {
+      "key": "enterpriseData",
+      "label": "Enterprise Data Mgmt",
+      "category": "technical"
+    }
+  ]
+}

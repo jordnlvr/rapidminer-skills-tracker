@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RapidMiner Skills Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 min-h-screen">
+    <div id="root"></div>
+    
+    <script type="module">
+        // Fetch team data from JSON file
+        let teamData = null;
+        
+        async function loadData() {
+            try {
+                const response = await fetch('./team-data.json');
+                teamData = await response.json();
+                renderApp();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('root').innerHTML = '<div class="p-8 text-center text-red-600"><h1 class="text-2xl font-bold">Error loading data</h1><p>Make sure team-data.json is in the same directory</p></div>';
+            }
+        }
+        
+        function getSkillValue(member, skillKey) {
+            return member.skills[skillKey] !== undefined ? member.skills[skillKey] : null;
+        }
+        
+        function getSkillColor(level) {
+            if (level === null || level === undefined) return 'bg-gray-100 text-gray-400';
+            if (level === 0) return 'bg-red-100 text-red-800';
+            if (level === 1) return 'bg-orange-100 text-orange-800';
+            if (level === 2) return 'bg-yellow-100 text-yellow-800';
+            if (level === 3) return 'bg-blue-100 text-blue-800';
+            if (level === 4) return 'bg-green-100 text-green-800';
+            if (level === 5) return 'bg-emerald-200 text-emerald-900 font-bold';
+            return 'bg-gray-100 text-gray-400';
+        }
+        
+        function calculateCoverage(skillKey) {
+            const values = teamData.teamMembers
+                .map(m => getSkillValue(m, skillKey))
+                .filter(v => v !== null && v !== undefined);
+            
+            if (values.length === 0) return { avg: 0, count: 0, expert: 0, proficient: 0, competent: 0, covered: 0 };
+            
+            const avg = values.reduce((a, b) => a + b, 0) / values.length;
+            const expert = values.filter(v => v === 5).length;
+            const proficient = values.filter(v => v === 4).length;
+            const competent = values.filter(v => v === 3).length;
+            const covered = values.filter(v => v >= 3).length;
+            
+            return { 
+                avg: avg.toFixed(1), 
+                count: values.length, 
+                expert, 
+                proficient, 
+                competent, 
+                covered 
+            };
+        }
+        
+        function calculateGapAnalysis() {
+            const gaps = [];
+            const teamSize = teamData.teamMembers.length;
+            
+            teamData.skillDefinitions.forEach(skill => {
+                const coverage = calculateCoverage(skill.key);
+                const coveragePercent = (coverage.covered / teamSize) * 100;
+                
+                if (coveragePercent < 33) {
+                    gaps.push({
+                        skill: skill.label,
+                        category: skill.category,
+                        severity: 'critical',
+                        coveragePercent: Math.round(coveragePercent),
+                        experts: coverage.expert,
+                        recommendation: coverage.count === 0 
+                            ? 'No team coverage - urgent training or hiring needed' 
+                            : 'Insufficient coverage - immediate training recommended'
+                    });
+                } else if (coveragePercent < 55) {
+                    gaps.push({
+                        skill: skill.label,
+                        category: skill.category,
+                        severity: 'moderate',
+                        coveragePercent: Math.round(coveragePercent),
+                        experts: coverage.expert,
+                        recommendation: coverage.expert === 0 
+                            ? 'No experts available - develop subject matter experts' 
+                            : 'Moderate coverage - consider cross-training'
+                    });
+                }
+            });
+            
+            return gaps.sort((a, b) => a.coveragePercent - b.coveragePercent);
+        }
+        
+        function exportToExcel() {
+            const gaps = calculateGapAnalysis();
+            const wb = XLSX.utils.book_new();
+            
+            // Dashboard sheet
+            const dashboardData = [
+                ['RAPIDMINER SKILLS TRACKER', '', '', '', '', '', '', '', '', '', `Last Updated: ${teamData.lastUpdated}`],
+                ['Professional Edition - Team Coverage Analysis'],
+                [''],
+                ['TEAM OVERVIEW'],
+                ['Total Team Members', teamData.teamMembers.length],
+                ['Members with Data', teamData.teamMembers.filter(m => Object.keys(m.skills).length > 0).length],
+                [''],
+                ['TOP SKILL GAPS'],
+                ['Skill', 'Category', 'Coverage %', 'Experts', 'Severity', 'Recommendation'],
+            ];
+            
+            gaps.slice(0, 10).forEach(gap => {
+                dashboardData.push([
+                    gap.skill,
+                    gap.category === 'product' ? 'Product/Tool' : 'Technical Domain',
+                    `${gap.coveragePercent}%`,
+                    gap.experts,
+                    gap.severity.toUpperCase(),
+                    gap.recommendation
+                ]);
+            });
+            
+            const wsDashboard = XLSX.utils.aoa_to_sheet(dashboardData);
+            wsDashboard['!cols'] = [{wch: 30}, {wch: 18}, {wch: 12}, {wch: 10}, {wch: 12}, {wch: 60}];
+            XLSX.utils.book_append_sheet(wb, wsDashboard, 'Dashboard');
+            
+            // Skills Matrix sheet
+            const matrixData = [
+                ['SKILLS MATRIX', '', '', ...teamData.skillDefinitions.map(s => ''), `Updated: ${teamData.lastUpdated}`],
+                [''],
+                ['Team Member', 'Role', ...teamData.skillDefinitions.map(s => s.label), 'Primary Industries', 'Secondary Industries'],
+            ];
+            
+            teamData.teamMembers.forEach(member => {
+                matrixData.push([
+                    member.name,
+                    member.role,
+                    ...teamData.skillDefinitions.map(s => {
+                        const val = getSkillValue(member, s.key);
+                        return val !== null ? val : '';
+                    }),
+                    member.industries.primary,
+                    member.industries.secondary
+                ]);
+            });
+            
+            matrixData.push(['']);
+            matrixData.push(['SKILL LEVEL KEY']);
+            matrixData.push(['0 = No Experience', '1 = Beginner', '2 = Advanced Beginner', '3 = Competent', '4 = Proficient', '5 = Expert']);
+            
+            const wsMatrix = XLSX.utils.aoa_to_sheet(matrixData);
+            wsMatrix['!cols'] = [
+                {wch: 15}, {wch: 25},
+                ...teamData.skillDefinitions.map(() => ({wch: 12})),
+                {wch: 30}, {wch: 30}
+            ];
+            XLSX.utils.book_append_sheet(wb, wsMatrix, 'Skills Matrix');
+            
+            // Coverage Analysis sheet
+            const coverageData = [
+                ['COVERAGE ANALYSIS BY SKILL'],
+                [''],
+                ['Product/Tool Skills'],
+                ['Skill', 'Team Coverage', 'Avg Level', 'Experts (5)', 'Proficient (4)', 'Competent (3)', 'Coverage %'],
+            ];
+            
+            teamData.skillDefinitions.filter(s => s.category === 'product').forEach(skill => {
+                const cov = calculateCoverage(skill.key);
+                coverageData.push([
+                    skill.label,
+                    `${cov.count}/${teamData.teamMembers.length}`,
+                    cov.avg,
+                    cov.expert,
+                    cov.proficient,
+                    cov.competent,
+                    `${Math.round((cov.covered/teamData.teamMembers.length)*100)}%`
+                ]);
+            });
+            
+            coverageData.push(['']);
+            coverageData.push(['Technical Domain Skills']);
+            coverageData.push(['Skill', 'Team Coverage', 'Avg Level', 'Experts (5)', 'Proficient (4)', 'Competent (3)', 'Coverage %']);
+            
+            teamData.skillDefinitions.filter(s => s.category === 'technical').forEach(skill => {
+                const cov = calculateCoverage(skill.key);
+                coverageData.push([
+                    skill.label,
+                    `${cov.count}/${teamData.teamMembers.length}`,
+                    cov.avg,
+                    cov.expert,
+                    cov.proficient,
+                    cov.competent,
+                    `${Math.round((cov.covered/teamData.teamMembers.length)*100)}%`
+                ]);
+            });
+            
+            const wsCoverage = XLSX.utils.aoa_to_sheet(coverageData);
+            wsCoverage['!cols'] = [{wch: 30}, {wch: 15}, {wch: 12}, {wch: 12}, {wch: 15}, {wch: 15}, {wch: 12}];
+            XLSX.utils.book_append_sheet(wb, wsCoverage, 'Coverage Analysis');
+            
+            // Skill Definitions sheet
+            const defsData = [
+                ['SKILL LEVEL DEFINITIONS'],
+                [''],
+                ['Level', 'Name', 'Description'],
+                [0, 'No Experience', 'No knowledge or experience with this skill/domain'],
+                [1, 'Beginner', 'Starting the learning journey'],
+                [2, 'Advanced Beginner', 'Hands-on experience and foundational knowledge'],
+                [3, 'Competent', 'Comfortable in presales role - handles most customer situations'],
+                [4, 'Proficient', 'Deep expertise - handles complex scenarios, mentors others'],
+                [5, 'Expert', 'Recognized authority and thought leader'],
+            ];
+            
+            const wsDefs = XLSX.utils.aoa_to_sheet(defsData);
+            wsDefs['!cols'] = [{wch: 10}, {wch: 20}, {wch: 60}];
+            XLSX.utils.book_append_sheet(wb, wsDefs, 'Skill Definitions');
+            
+            XLSX.writeFile(wb, `RapidMiner_Skills_Tracker_${teamData.lastUpdated}.xlsx`);
+        }
+        
+        function renderApp() {
+            const gaps = calculateGapAnalysis();
+            const teamStats = {
+                totalMembers: teamData.teamMembers.length,
+                withData: teamData.teamMembers.filter(m => Object.keys(m.skills).length > 0).length,
+                avgSkill: (teamData.teamMembers.reduce((sum, m) => {
+                    const vals = Object.values(m.skills).filter(v => v !== null && v !== undefined);
+                    return sum + (vals.length > 0 ? vals.reduce((a,b) => a+b, 0) / vals.length : 0);
+                }, 0) / teamData.teamMembers.length).toFixed(1),
+                criticalGaps: gaps.filter(g => g.severity === 'critical').length
+            };
+            
+            let currentTab = 'matrix';
+            
+            function render() {
+                const root = document.getElementById('root');
+                root.innerHTML = `
+                    <div class="max-w-[1600px] mx-auto p-6">
+                        <!-- Header -->
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-2xl p-6 mb-6 text-white">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h1 class="text-4xl font-bold mb-2">RapidMiner Skills Tracker</h1>
+                                    <p class="text-blue-100 text-lg">${teamData.teamName} - Coverage Matrix</p>
+                                    <p class="text-sm text-blue-200 mt-1">Last Updated: ${teamData.lastUpdated}</p>
+                                </div>
+                                <button onclick="window.exportToExcel()" class="flex items-center gap-2 bg-white text-blue-600 px-6 py-3 rounded-lg hover:bg-blue-50 transition shadow-lg font-semibold">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                    <span>Export to Excel</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Stats -->
+                            <div class="grid grid-cols-4 gap-4 mt-6">
+                                <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+                                    <div class="text-sm text-blue-100 mb-1">Team Size</div>
+                                    <div class="text-3xl font-bold">${teamStats.totalMembers}</div>
+                                    <div class="text-sm text-blue-200">${teamStats.withData} with data</div>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+                                    <div class="text-sm text-blue-100 mb-1">Avg Skill Level</div>
+                                    <div class="text-3xl font-bold">${teamStats.avgSkill}</div>
+                                    <div class="text-sm text-blue-200">out of 5.0</div>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+                                    <div class="text-sm text-blue-100 mb-1">Total Skills</div>
+                                    <div class="text-3xl font-bold">${teamData.skillDefinitions.length}</div>
+                                    <div class="text-sm text-blue-200">tracked</div>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+                                    <div class="text-sm text-blue-100 mb-1">Critical Gaps</div>
+                                    <div class="text-3xl font-bold">${teamStats.criticalGaps}</div>
+                                    <div class="text-sm text-blue-200">need attention</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tabs -->
+                        <div class="bg-white rounded-t-xl shadow-xl">
+                            <div class="flex border-b border-slate-200">
+                                <button onclick="window.switchTab('matrix')" class="px-6 py-4 font-semibold transition ${currentTab === 'matrix' ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50' : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'}">
+                                    Skills Matrix
+                                </button>
+                                <button onclick="window.switchTab('dashboard')" class="px-6 py-4 font-semibold transition ${currentTab === 'dashboard' ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50' : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'}">
+                                    Coverage Dashboard
+                                </button>
+                                <button onclick="window.switchTab('gaps')" class="px-6 py-4 font-semibold transition ${currentTab === 'gaps' ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50' : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'}">
+                                    Gap Analysis
+                                </button>
+                            </div>
+                            
+                            <div class="p-6" id="tab-content"></div>
+                        </div>
+                    </div>
+                `;
+                
+                renderTabContent();
+            }
+            
+            function renderTabContent() {
+                const content = document.getElementById('tab-content');
+                
+                if (currentTab === 'matrix') {
+                    content.innerHTML = `
+                        <div class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-600 rounded">
+                            <p class="text-sm text-slate-700">
+                                <strong>Color coding:</strong> Red (0) = No experience • Orange (1) = Beginner • Yellow (2) = Advanced Beginner • Blue (3) = Competent • Green (4) = Proficient • Dark Green (5) = Expert
+                            </p>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full border-collapse">
+                                <thead>
+                                    <tr class="bg-gradient-to-r from-slate-100 to-slate-50">
+                                        <th class="border border-slate-300 px-4 py-3 text-left font-bold text-slate-700">Name</th>
+                                        <th class="border border-slate-300 px-4 py-3 text-left font-bold text-slate-700">Role</th>
+                                        ${teamData.skillDefinitions.map(s => `<th class="border border-slate-300 px-3 py-3 text-center font-semibold text-slate-700 text-xs">${s.label}</th>`).join('')}
+                                        <th class="border border-slate-300 px-4 py-3 text-center font-bold text-slate-700">Industries</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${teamData.teamMembers.map(member => `
+                                        <tr class="hover:bg-blue-50 transition">
+                                            <td class="border border-slate-300 px-4 py-3 font-bold text-slate-800">${member.name}</td>
+                                            <td class="border border-slate-300 px-4 py-3 text-sm text-slate-600">${member.role || '-'}</td>
+                                            ${teamData.skillDefinitions.map(skill => {
+                                                const val = getSkillValue(member, skill.key);
+                                                return `<td class="border border-slate-300 px-3 py-3 text-center font-semibold ${getSkillColor(val)}">${val !== null ? val : '-'}</td>`;
+                                            }).join('')}
+                                            <td class="border border-slate-300 px-4 py-3 text-sm">${member.industries.primary || '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                } else if (currentTab === 'dashboard') {
+                    const productSkills = teamData.skillDefinitions.filter(s => s.category === 'product');
+                    const technicalSkills = teamData.skillDefinitions.filter(s => s.category === 'technical');
+                    
+                    content.innerHTML = `
+                        <div class="space-y-8">
+                            <div>
+                                <h2 class="text-2xl font-bold text-slate-800 mb-4">Product/Tool Coverage</h2>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    ${productSkills.map(skill => {
+                                        const cov = calculateCoverage(skill.key);
+                                        const pct = Math.round((cov.covered / teamData.teamMembers.length) * 100);
+                                        return `
+                                            <div class="bg-white border-2 border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                                                <h3 class="font-bold text-slate-800 mb-3 text-lg">${skill.label}</h3>
+                                                <div class="mb-3">
+                                                    <div class="flex justify-between text-xs text-slate-600 mb-1">
+                                                        <span>Coverage</span>
+                                                        <span class="font-semibold">${pct}%</span>
+                                                    </div>
+                                                    <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                                                        <div class="h-full ${pct >= 55 ? 'bg-green-500' : pct >= 33 ? 'bg-yellow-500' : 'bg-red-500'}" style="width: ${pct}%"></div>
+                                                    </div>
+                                                </div>
+                                                <div class="space-y-1 text-sm">
+                                                    <div class="flex justify-between">
+                                                        <span class="text-slate-600">Avg Level:</span>
+                                                        <span class="font-bold">${cov.avg}</span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-emerald-600">Experts:</span>
+                                                        <span class="font-bold text-emerald-600">${cov.expert}</span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-green-600">Proficient:</span>
+                                                        <span class="font-bold text-green-600">${cov.proficient}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h2 class="text-2xl font-bold text-slate-800 mb-4">Technical Domain Coverage</h2>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    ${technicalSkills.map(skill => {
+                                        const cov = calculateCoverage(skill.key);
+                                        const pct = Math.round((cov.covered / teamData.teamMembers.length) * 100);
+                                        return `
+                                            <div class="bg-white border-2 border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                                                <h3 class="font-bold text-slate-800 mb-3 text-lg">${skill.label}</h3>
+                                                <div class="mb-3">
+                                                    <div class="flex justify-between text-xs text-slate-600 mb-1">
+                                                        <span>Coverage</span>
+                                                        <span class="font-semibold">${pct}%</span>
+                                                    </div>
+                                                    <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                                                        <div class="h-full ${pct >= 55 ? 'bg-green-500' : pct >= 33 ? 'bg-yellow-500' : 'bg-red-500'}" style="width: ${pct}%"></div>
+                                                    </div>
+                                                </div>
+                                                <div class="space-y-1 text-sm">
+                                                    <div class="flex justify-between">
+                                                        <span class="text-slate-600">Avg Level:</span>
+                                                        <span class="font-bold">${cov.avg}</span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-emerald-600">Experts:</span>
+                                                        <span class="font-bold text-emerald-600">${cov.expert}</span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-green-600">Proficient:</span>
+                                                        <span class="font-bold text-green-600">${cov.proficient}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (currentTab === 'gaps') {
+                    if (gaps.length === 0) {
+                        content.innerHTML = `
+                            <div class="bg-green-50 border-2 border-green-200 rounded-xl p-8 text-center">
+                                <h3 class="text-xl font-bold text-green-900 mb-2">Excellent Coverage!</h3>
+                                <p class="text-green-700">No significant skill gaps detected.</p>
+                            </div>
+                        `;
+                    } else {
+                        content.innerHTML = `
+                            <div class="bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 p-6 rounded-lg mb-6">
+                                <h3 class="font-bold text-lg text-red-900 mb-2">Skills Gap Analysis</h3>
+                                <p class="text-slate-700"><strong>Critical gaps</strong> require immediate attention. <strong>Moderate gaps</strong> should be addressed through cross-training.</p>
+                            </div>
+                            <div class="space-y-3">
+                                ${gaps.map(gap => `
+                                    <div class="border-2 rounded-xl p-5 ${gap.severity === 'critical' ? 'bg-red-50 border-red-300' : 'bg-yellow-50 border-yellow-300'}">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div class="flex-1">
+                                                <div class="flex items-center gap-3 mb-2">
+                                                    <h4 class="font-bold text-lg text-slate-800">${gap.skill}</h4>
+                                                    <span class="px-3 py-1 rounded-full text-xs font-bold ${gap.severity === 'critical' ? 'bg-red-600 text-white' : 'bg-yellow-600 text-white'}">
+                                                        ${gap.severity.toUpperCase()}
+                                                    </span>
+                                                </div>
+                                                <p class="text-slate-700 mb-3">${gap.recommendation}</p>
+                                                <div class="flex items-center gap-6 text-sm">
+                                                    <div><span class="text-slate-600">Coverage:</span> <span class="font-bold">${gap.coveragePercent}%</span></div>
+                                                    <div><span class="text-slate-600">Experts:</span> <span class="font-bold">${gap.experts}</span></div>
+                                                </div>
+                                            </div>
+                                            <div class="text-4xl font-bold ${gap.severity === 'critical' ? 'text-red-600' : 'text-yellow-600'}">
+                                                ${gap.coveragePercent}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                    }
+                }
+            }
+            
+            window.switchTab = function(tab) {
+                currentTab = tab;
+                render();
+            };
+            
+            window.exportToExcel = exportToExcel;
+            
+            render();
+        }
+        
+        loadData();
+    </script>
+</body>
+</html>
